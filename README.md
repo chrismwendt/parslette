@@ -5,17 +5,11 @@ This is an experiment in writing a Ruby parsing library using concepts from func
 ## TODO
 
 - Core
-  - Stream abstraction
-  - `satisfy`
-  - Functor
-  - Applicative
   - Monad
 - Combinators
   - `zeroOrMore`
   - `oneOrMore`
 - Strings
-  - Character primitive
-  - String primitive
   - Regular expression primitive
 - Benchmarks
 
