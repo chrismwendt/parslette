@@ -12,6 +12,7 @@ module Parslette
     pp(parse_string.call(z).call("hi"))
     pp(parse_string.call(char.call('h')).call("h"))
     pp(parse_string.call(string.call("hello")).call("hell"))
+    pp(parse_string.call(alt.call(string.call("hello")).call(string.call("true"))).call("true"))
   end
 
   def self.foldl; lambda { |f| lambda { |zero| lambda { |t| t.reduce(zero) { |accumulator, a| f.call(accumulator).call(a) } } } } end
@@ -41,15 +42,22 @@ module Parslette
     when :progress; { :progress => lambda { |x| pair.call(a[:progress].call(x)).call(b) } }
     end } } end
 
-  def self.parse; lambda { |parser| lambda { |input|
-    f = lambda { |accumulator| lambda { |a|
-      case key.call(accumulator)
-      when :success; { :failure => "Extra input starting at " + a.inspect }
-      when :failure; accumulator
-      when :progress; value.call(accumulator).call(a)
-      end } }
+  def self.alt; lambda { |a| lambda { |b|
+    case key.call(a)
+    when :success; a
+    when :failure; b
+    when :progress; { :progress => lambda { |x| alt.call(a[:progress].call(x)).call(feed.call(b).call(x)) } }
+    end } } end
 
-    foldl.call(f).call(parser).call(input) } } end
+  def self.feed; lambda { |p| lambda { |c|
+    case key.call(p)
+    when :success; { :failure => "Extra input at " + c.inspect }
+    when :failure; p
+    when :progress; p[:progress].call(c)
+    end } } end
+
+  def self.parse; lambda { |parser| lambda { |input|
+    foldl.call(feed).call(parser).call(input) } } end
 
   def self.parse_string; lambda { |parser| lambda { |string|
     r = parse.call(parser).call(string.split(""))
