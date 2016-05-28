@@ -13,6 +13,7 @@ module Parslette
     pp(parse_string.call(char.call('h')).call("h"))
     pp(parse_string.call(string.call("hello")).call("hell"))
     pp(parse_string.call(alt.call(string.call("hello")).call(string.call("true"))).call("true"))
+    pp(parse_string.call(apply.call(fmap.call(lambda { |a| lambda { |b| a.to_i + b.to_i } }).call(char.call("2"))).call(char.call("3"))).call("23"))
   end
 
   def self.foldl; lambda { |f| lambda { |zero| lambda { |t| t.reduce(zero) { |accumulator, a| f.call(accumulator).call(a) } } } } end
@@ -41,6 +42,8 @@ module Parslette
     when :failure; a
     when :progress; { :progress => lambda { |x| pair.call(a[:progress].call(x)).call(b) } }
     end } } end
+
+  def self.apply; lambda { |a| lambda { |b| fmap.call(lambda { |p| p[0].call(p[1]) }).call(pair.call(a).call(b)) } } end
 
   def self.alt; lambda { |a| lambda { |b|
     case key.call(a)
