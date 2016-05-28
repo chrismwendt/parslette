@@ -5,6 +5,7 @@ This is an experiment in writing a Ruby parsing library using concepts from func
 ## TODO
 
 - Core
+  - Alternative
   - Monad
 - Combinators
   - `zeroOrMore`
