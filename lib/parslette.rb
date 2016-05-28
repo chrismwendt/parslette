@@ -16,8 +16,6 @@ module Parslette
 
   def self.foldl; lambda { |f| lambda { |zero| lambda { |t| t.reduce(zero) { |accumulator, a| f.call(accumulator).call(a) } } } } end
 
-  def self.foldr; lambda { |f| lambda { |a| lambda { |bs| foldl.call(lambda { |g| lambda { |b| lambda { |x| g.call(f.call(b).call(x)) } } }).call(id).call(bs).call(a) } } } end
-
   def self.key; lambda { |h| h.keys.first } end
 
   def self.value; lambda { |h| h[key.call(h)] } end
