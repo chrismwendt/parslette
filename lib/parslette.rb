@@ -4,6 +4,8 @@ require "pp"
 module Parslette
   def self.id; lambda { |x| x } end
 
+  def self.digit; satisfy.call(lambda { |c| "0" <= c && c <= "9" }) end
+
   def self.ex
     is_alpha = lambda { |a| a <= 'z' && 'a' <= a }
     toi = lambda { |r| r.to_i }
@@ -13,7 +15,7 @@ module Parslette
     pp(parse_string.call(char.call('h')).call("h"))
     pp(parse_string.call(string.call("hello")).call("hell"))
     pp(parse_string.call(alt.call(string.call("hello")).call(string.call("true"))).call("true"))
-    pp(parse_string.call(apply.call(fmap.call(lambda { |a| lambda { |b| a.to_i + b.to_i } }).call(char.call("2"))).call(char.call("3"))).call("23"))
+    pp(parse_string.call(apply.call(fmap.call(lambda { |a| lambda { |b| a.to_i + b.to_i } }).call(digit)).call(digit)).call("23"))
   end
 
   def self.foldl; lambda { |f| lambda { |zero| lambda { |t| t.reduce(zero) { |accumulator, a| f.call(accumulator).call(a) } } } } end
@@ -71,6 +73,8 @@ module Parslette
     end } } end
 
   def self.char; lambda { |c| satisfy.call(lambda { |a| a == c }) } end
+
+  def self.match; lambda { |re| satisfy.call(lambda { |a| a =~ re }) } end
 
   def self.string; lambda { |s|
     fmap
