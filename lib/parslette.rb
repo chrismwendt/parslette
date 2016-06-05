@@ -14,8 +14,12 @@ module Parslette
     pp(parse_string.call(z).call("hi"))
     pp(parse_string.call(char.call('h')).call("h"))
     pp(parse_string.call(string.call("hello")).call("hell"))
-    pp(parse_string.call(alt.call(string.call("hello")).call(string.call("true"))).call("true"))
+    pp(parse_string.call(alt.call(string.call("hello")).call(string.call("hell"))).call("hell"))
     pp(parse_string.call(apply.call(fmap.call(lambda { |a| lambda { |b| a.to_i + b.to_i } }).call(digit)).call(digit)).call("23"))
+  end
+
+  def self.json
+    spaces = match.call(/\s/)
   end
 
   def self.foldl; lambda { |f| lambda { |zero| lambda { |t| t.reduce(zero) { |accumulator, a| f.call(accumulator).call(a) } } } } end
@@ -56,6 +60,7 @@ module Parslette
 
   def self.feed; lambda { |p| lambda { |c|
     case key.call(p)
+    # handle EOF as a special case
     when :success; { :failure => "Extra input at " + c.inspect }
     when :failure; p
     when :progress; p[:progress].call(c)
@@ -81,6 +86,6 @@ module Parslette
       .call(lambda { |x| x.string })
       .call(foldl
         .call(lambda { |sb| lambda { |c| fmap.call(lambda { |aa| aa[0] << aa[1] }).call(pair.call(sb).call(c)) } })
-        .call(fmap.call(lambda { |x| StringIO.new }).call(unit))
+        .call(fmap.call(lambda { |_| StringIO.new }).call(unit))
         .call(s.split("").map &char)) } end
 end
