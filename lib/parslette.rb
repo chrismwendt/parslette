@@ -42,12 +42,16 @@ module Parslette
 
   def self.unit; { :success => nil } end
 
+  def self.pure; lambda { |v| { :success => v } } end
+
   def self.pair; lambda { |a| lambda { |b|
     case key.call(a)
     when :success; fmap.call(lambda { |bval| [a[:success], bval] }).call(b)
     when :failure; a
     when :progress; { :progress => lambda { |x| pair.call(a[:progress].call(x)).call(b) } }
     end } } end
+
+  def self.seqr; lambda { |a| lambda { |b| fmap.call(lambda { |p| p[1] }).call(pair.call(a).call(b)) } } end
 
   def self.apply; lambda { |a| lambda { |b| fmap.call(lambda { |p| p[0].call(p[1]) }).call(pair.call(a).call(b)) } } end
 
@@ -60,14 +64,13 @@ module Parslette
 
   def self.feed; lambda { |p| lambda { |c|
     case key.call(p)
-    # handle EOF as a special case
-    when :success; { :failure => "Extra input at " + c.inspect }
+    when :success; p
     when :failure; p
     when :progress; p[:progress].call(c)
     end } } end
 
   def self.parse; lambda { |parser| lambda { |input|
-    foldl.call(feed).call(parser).call(input) } } end
+    foldl.call(feed).call(parser).call(input + [nil]) } } end
 
   def self.parse_string; lambda { |parser| lambda { |string|
     r = parse.call(parser).call(string.split(""))
@@ -76,6 +79,8 @@ module Parslette
     when :failure; r
     when :progress; { :failure => "Expected more input" }
     end } } end
+
+  def self.eof; satisfy.call(lambda { |a| a.nil? }) end
 
   def self.char; lambda { |c| satisfy.call(lambda { |a| a == c }) } end
 
