@@ -85,4 +85,7 @@ module Parslette
       when :progress; { :progress => lambda { |c| thing.call(par[:progress].call(c)) } }
       end }
     thing.call(p) } end
+
+  def self.many1; lambda { |p|
+    fmap.call(lambda { |v| [v[0]] + v[1] }).call(pair.call(p).call(many.call(p))) } end
 end
