@@ -4,23 +4,7 @@ require "pp"
 module Parslette
   def self.id; lambda { |x| x } end
 
-  def self.digit; satisfy.call(lambda { |c| "0" <= c && c <= "9" }) end
-
-  def self.ex
-    is_alpha = lambda { |a| a <= 'z' && 'a' <= a }
-    toi = lambda { |r| r.to_i }
-    alpha = satisfy.call(is_alpha)
-    z = pair.call(alpha).call(alpha)
-    pp(parse_string.call(z).call("hi"))
-    pp(parse_string.call(char.call('h')).call("h"))
-    pp(parse_string.call(string.call("hello")).call("hell"))
-    pp(parse_string.call(alt.call(string.call("hello")).call(string.call("hell"))).call("hell"))
-    pp(parse_string.call(apply.call(fmap.call(lambda { |a| lambda { |b| a.to_i + b.to_i } }).call(digit)).call(digit)).call("23"))
-  end
-
-  def self.json
-    spaces = match.call(/\s/)
-  end
+  def self.force; lambda { |v| v.class == Proc ? v.call : v } end
 
   def self.foldl; lambda { |f| lambda { |zero| lambda { |t| t.reduce(zero) { |accumulator, a| f.call(accumulator).call(a) } } } } end
 
@@ -62,6 +46,7 @@ module Parslette
     when :progress; { :progress => lambda { |x| alt.call(a[:progress].call(x)).call(feed.call(b).call(x)) } }
     end } } end
 
+  # TODO inline feed since success and failure stop consuming
   def self.feed; lambda { |p| lambda { |c|
     case key.call(p)
     when :success; p
@@ -87,10 +72,17 @@ module Parslette
   def self.match; lambda { |re| satisfy.call(lambda { |a| a =~ re }) } end
 
   def self.string; lambda { |s|
-    fmap
-      .call(lambda { |x| x.string })
-      .call(foldl
-        .call(lambda { |sb| lambda { |c| fmap.call(lambda { |aa| aa[0] << aa[1] }).call(pair.call(sb).call(c)) } })
-        .call(fmap.call(lambda { |_| StringIO.new }).call(unit))
-        .call(s.split("").map &char)) } end
+    foldl
+      .call(lambda { |acc| lambda { |c| fmap.call(lambda { |v| v[0] + v[1] }).call(pair.call(acc).call(c)) } })
+      .call(fmap.call(lambda { |_| "" }).call(unit))
+      .call(s.split("").map &char) } end
+
+  def self.many; lambda { |p|
+    thing = lambda { |par|
+      case key.call(par)
+      when :success; fmap.call(lambda { |other| [par[:success]] + other }).call(many.call(p))
+      when :failure; { :success => [] }
+      when :progress; { :progress => lambda { |c| thing.call(par[:progress].call(c)) } }
+      end }
+    thing.call(p) } end
 end
