@@ -15,15 +15,15 @@ module Parslette
 
   def self.satisfy; lambda { |predicate| { :progress => lambda { |a|
     predicate.call(a) ?
-      { :success => a } :
-      { :failure => a.inspect + " did not satisfy the predicate" } } } } end
+      [{ :success => a }] :
+      [{ :failure => a.inspect + " did not satisfy the predicate" }] } } } end
 
   def self.fmap; lambda { |f| lambda { |parser| lambda {
     fparser = force.call(parser)
     case key.call(fparser)
     when :success; { :success => f.call(fparser[:success]) }
     when :failure; fparser
-    when :progress; { :progress => lambda { |a| fmap.call(f).call(fparser[:progress].call(a)) } }
+    when :progress; { :progress => lambda { |a| fparser[:progress].call(a).map { |pp| fmap.call(f).call(pp) } } }
     end } } } end
 
   def self.unit; { :success => nil } end
@@ -35,7 +35,7 @@ module Parslette
     case key.call(fa)
     when :success; fmap.call(lambda { |bval| [fa[:success], bval] }).call(force.call(b))
     when :failure; fa
-    when :progress; { :progress => lambda { |x| pair.call(fa[:progress].call(x)).call(force.call(b)) } }
+    when :progress; { :progress => lambda { |x| fa[:progress].call(x).map { |pp| pair.call(pp).call(force.call(b)) } } }
     end } } } end
 
   def self.seqr; lambda { |a| lambda { |b| fmap.call(lambda { |p| p[1] }).call(pair.call(a).call(b)) } } end
@@ -47,28 +47,30 @@ module Parslette
     case key.call(fa)
     when :success; fa
     when :failure; force.call(b)
-    when :progress; { :progress => lambda { |x| alt.call(fa[:progress].call(x)).call(feed.call(force.call(b)).call(x)) } }
+    when :progress; { :progress => lambda { |x| fa[:progress].call(x) + feed.call(force.call(b)).call(x) } }
     end } } } end
 
   # TODO inline feed since success and failure stop consuming
   def self.feed; lambda { |p| lambda { |c|
     fp = force.call(p)
     case key.call(fp)
-    when :success; fp
-    when :failure; fp
+    when :success; [fp]
+    when :failure; [fp]
     when :progress; fp[:progress].call(c)
     end } } end
 
   def self.parse; lambda { |parser| lambda { |input|
-    foldl.call(feed).call(parser).call(input + [nil]) } } end
+    foldl.call(lambda { |p| lambda { |c| p.flat_map { |pp| feed.call(pp).call(c) } } }).call([parser]).call(input + [nil]) } } end
 
   def self.parse_string; lambda { |parser| lambda { |string|
-    r = force.call(parse.call(parser).call(string.split("")))
-    case key.call(r)
-    when :success; r
-    when :failure; r
-    when :progress; { :failure => "Expected more input" }
-    end } } end
+    force.call(parse.call(parser).call(string.split("")))
+      .map(&force)
+      .map { |r|
+        case key.call(r)
+        when :success; r
+        when :failure; r
+        when :progress; { :failure => "Expected more input" }
+        end } } } end
 
   def self.eof; satisfy.call(lambda { |a| a.nil? }) end
 
