@@ -1,10 +1,11 @@
 require "parslette/version"
 require "pp"
+require "pry-byebug"
 
 module Parslette
   def self.id; lambda { |x| x } end
 
-  def self.force; lambda { |v| v.class == Proc ? v.call : v } end
+  def self.force; lambda { |v| v.class == Proc ? force.call(v.call) : v } end
 
   def self.foldl; lambda { |f| lambda { |zero| lambda { |t| t.reduce(zero) { |accumulator, a| f.call(accumulator).call(a) } } } } end
 
@@ -17,48 +18,52 @@ module Parslette
       { :success => a } :
       { :failure => a.inspect + " did not satisfy the predicate" } } } } end
 
-  def self.fmap; lambda { |f| lambda { |parser|
-    case key.call(parser)
-    when :success; { :success => f.call(parser[:success]) }
-    when :failure; parser
-    when :progress; { :progress => lambda { |a| fmap.call(f).call(parser[:progress].call(a)) } }
-    end } } end
+  def self.fmap; lambda { |f| lambda { |parser| lambda {
+    fparser = force.call(parser)
+    case key.call(fparser)
+    when :success; { :success => f.call(fparser[:success]) }
+    when :failure; fparser
+    when :progress; { :progress => lambda { |a| fmap.call(f).call(fparser[:progress].call(a)) } }
+    end } } } end
 
   def self.unit; { :success => nil } end
 
   def self.pure; lambda { |v| { :success => v } } end
 
-  def self.pair; lambda { |a| lambda { |b|
-    case key.call(a)
-    when :success; fmap.call(lambda { |bval| [a[:success], bval] }).call(b)
-    when :failure; a
-    when :progress; { :progress => lambda { |x| pair.call(a[:progress].call(x)).call(b) } }
-    end } } end
+  def self.pair; lambda { |a| lambda { |b| lambda {
+    fa = force.call(a)
+    case key.call(fa)
+    when :success; fmap.call(lambda { |bval| [fa[:success], bval] }).call(force.call(b))
+    when :failure; fa
+    when :progress; { :progress => lambda { |x| pair.call(fa[:progress].call(x)).call(force.call(b)) } }
+    end } } } end
 
   def self.seqr; lambda { |a| lambda { |b| fmap.call(lambda { |p| p[1] }).call(pair.call(a).call(b)) } } end
 
   def self.apply; lambda { |a| lambda { |b| fmap.call(lambda { |p| p[0].call(p[1]) }).call(pair.call(a).call(b)) } } end
 
-  def self.alt; lambda { |a| lambda { |b|
-    case key.call(a)
-    when :success; a
-    when :failure; b
-    when :progress; { :progress => lambda { |x| alt.call(a[:progress].call(x)).call(feed.call(b).call(x)) } }
-    end } } end
+  def self.alt; lambda { |a| lambda { |b| lambda {
+    fa = force.call(a)
+    case key.call(fa)
+    when :success; fa
+    when :failure; force.call(b)
+    when :progress; { :progress => lambda { |x| alt.call(fa[:progress].call(x)).call(feed.call(force.call(b)).call(x)) } }
+    end } } } end
 
   # TODO inline feed since success and failure stop consuming
   def self.feed; lambda { |p| lambda { |c|
-    case key.call(p)
-    when :success; p
-    when :failure; p
-    when :progress; p[:progress].call(c)
+    fp = force.call(p)
+    case key.call(fp)
+    when :success; fp
+    when :failure; fp
+    when :progress; fp[:progress].call(c)
     end } } end
 
   def self.parse; lambda { |parser| lambda { |input|
     foldl.call(feed).call(parser).call(input + [nil]) } } end
 
   def self.parse_string; lambda { |parser| lambda { |string|
-    r = parse.call(parser).call(string.split(""))
+    r = force.call(parse.call(parser).call(string.split("")))
     case key.call(r)
     when :success; r
     when :failure; r
@@ -78,14 +83,9 @@ module Parslette
       .call(s.split("").map &char) } end
 
   def self.many; lambda { |p|
-    thing = lambda { |par|
-      case key.call(par)
-      when :success; fmap.call(lambda { |other| [par[:success]] + other }).call(many.call(p))
-      when :failure; { :success => [] }
-      when :progress; { :progress => lambda { |c| thing.call(par[:progress].call(c)) } }
-      end }
-    thing.call(p) } end
-
-  def self.many1; lambda { |p|
-    fmap.call(lambda { |v| [v[0]] + v[1] }).call(pair.call(p).call(many.call(p))) } end
+    alt
+      .call(fmap
+        .call(lambda { |v| [v[0]] + v[1] })
+        .call(pair.call(p).call(lambda { many.call(p) })))
+      .call(pure.call([])) } end
 end
