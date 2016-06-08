@@ -5,12 +5,8 @@ This is an experiment in writing a Ruby parsing library using concepts from func
 ## TODO
 
 - Core
+  - Consider tradeoffs between flattening parsers and backtracking
   - Monad
-- Combinators
-  - `zeroOrMore`
-  - `oneOrMore`
-- Strings
-  - Regular expression primitive
 - Benchmarks
 
 ## Installation
